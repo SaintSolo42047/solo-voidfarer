@@ -66,7 +66,12 @@ class Game:
         return successes, dice
 
     def draw_tutorial(self):
-        pygame.draw.rect(screen, (0, 0, 0, 200), (100, 100, WIDTH-200, HEIGHT-200))
+        # Create semi-transparent overlay
+        overlay = pygame.Surface((WIDTH-200, HEIGHT-200))
+        overlay.fill((0, 0, 0))
+        overlay.set_alpha(200)
+        screen.blit(overlay, (100, 100))
+        
         text = big_font.render("TUTORIAL - Solo Voidfarer", True, GREEN)
         screen.blit(text, (WIDTH//2 - 200, 150))
         lines = [
@@ -128,6 +133,7 @@ class Game:
                         self.ship.thrust = 5
                     if event.key == pygame.K_DOWN:
                         self.ship.y += 10
+                        self.ship.thrust = 5
                     if event.key == pygame.K_LEFT:
                         self.ship.x -= 10
                     if event.key == pygame.K_RIGHT:
