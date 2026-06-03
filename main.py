@@ -27,10 +27,9 @@ class Ship:
         self.thrust = 0
 
     def draw(self, surface):
-        # Improved ship sprite with panels and thrusters
         pygame.draw.polygon(surface, BLUE, [(self.x, self.y-20), (self.x-20, self.y+20), (self.x+20, self.y+20)])
-        pygame.draw.rect(surface, WHITE, (self.x-8, self.y-8, 16, 16))  # cockpit
-        pygame.draw.rect(surface, GRAY, (self.x-15, self.y+10, 30, 8))  # body panels
+        pygame.draw.rect(surface, WHITE, (self.x-8, self.y-8, 16, 16))
+        pygame.draw.rect(surface, GRAY, (self.x-15, self.y+10, 30, 8))
         if self.thrust > 0:
             pygame.draw.polygon(surface, RED, [(self.x-10, self.y+20), (self.x, self.y+30), (self.x+10, self.y+20)])
 
@@ -43,15 +42,54 @@ class Goal:
     def mark(self, amount):
         self.progress = min(10, self.progress + amount)
 
+class Button:
+    def __init__(self, x, y, width, height, text):
+        self.rect = pygame.Rect(x, y, width, height)
+        self.text = text
+        self.color = BLUE
+        self.hovered = False
+
+    def draw(self, surface):
+        color = (150, 200, 255) if self.hovered else BLUE
+        pygame.draw.rect(surface, color, self.rect)
+        pygame.draw.rect(surface, WHITE, self.rect, 2)
+        text_surf = font.render(self.text, True, WHITE)
+        text_rect = text_surf.get_rect(center=self.rect.center)
+        surface.blit(text_surf, text_rect)
+
+    def is_clicked(self, pos):
+        return self.rect.collidepoint(pos)
+
+    def update(self, pos):
+        self.hovered = self.rect.collidepoint(pos)
+
 class Game:
     def __init__(self):
         self.ship = Ship()
         self.goals = [Goal("Reach next sector", "Normal"), Goal("Upgrade scanner", "Easy")]
-        self.log = ["Welcome. Press T for tutorial."]
+        self.log = ["Welcome. Tap buttons to play."]
         self.state = "play"
-        self.current_npc = None
-        self.dialog_text = ""
         self.show_tutorial = True
+        
+        # Mobile-friendly buttons
+        self.buttons = [
+            Button(WIDTH-200, 50, 180, 50, "Progress"),
+            Button(WIDTH-200, 110, 180, 50, "Travel"),
+            Button(WIDTH-200, 170, 180, 50, "Arrive"),
+            Button(WIDTH-200, 230, 180, 50, "Scavenge"),
+            Button(WIDTH-200, 290, 180, 50, "Explore"),
+            Button(WIDTH-200, 350, 180, 50, "Resources"),
+            Button(WIDTH-200, 410, 180, 50, "Combat"),
+            Button(WIDTH-200, 470, 180, 50, "Status"),
+        ]
+        
+        # Movement buttons for mobile
+        self.move_buttons = [
+            Button(WIDTH//2 - 40, 100, 80, 80, "↑"),
+            Button(50, HEIGHT-150, 80, 80, "←"),
+            Button(150, HEIGHT-150, 80, 80, "↓"),
+            Button(250, HEIGHT-150, 80, 80, "→"),
+        ]
 
     def add_log(self, text):
         self.log.append(text)
@@ -66,7 +104,6 @@ class Game:
         return successes, dice
 
     def draw_tutorial(self):
-        # Create semi-transparent overlay
         overlay = pygame.Surface((WIDTH-200, HEIGHT-200))
         overlay.fill((0, 0, 0))
         overlay.set_alpha(200)
@@ -75,76 +112,89 @@ class Game:
         text = big_font.render("TUTORIAL - Solo Voidfarer", True, GREEN)
         screen.blit(text, (WIDTH//2 - 200, 150))
         lines = [
-            "Arrow keys move ship",
-            "Click sidebar buttons for Moves",
+            "Tap arrow buttons to move ship",
+            "Tap sidebar buttons for Moves",
             "Progress bars fill as you complete missions",
             "Resources deplete on Travel and Explore",
             "NPCs use Perilous Void tables for dialog",
-            "Press T to close tutorial"
         ]
         for i, line in enumerate(lines):
             t = font.render(line, True, WHITE)
             screen.blit(t, (150, 220 + i*30))
+        
+        close_btn = Button(WIDTH//2 - 50, HEIGHT - 150, 100, 50, "Close")
+        close_btn.draw(screen)
+        return close_btn.rect
 
     def draw_ui(self):
-        # Sidebar buttons with hover glow
-        buttons = ["Progress", "Travel", "Arrive", "Scavenge", "Explore", "Resources", "Combat", "Status"]
-        for i, btn in enumerate(buttons):
-            rect = pygame.Rect(WIDTH-200, 50 + i*60, 180, 50)
-            color = BLUE
-            if rect.collidepoint(pygame.mouse.get_pos()):
-                color = (150, 200, 255)
-            pygame.draw.rect(screen, color, rect)
-            text = font.render(btn, True, WHITE)
-            screen.blit(text, (WIDTH-190, 65 + i*60))
-
-        # Improved status panel
+        # Draw sidebar buttons
+        for btn in self.buttons:
+            btn.draw(screen)
+        
+        # Draw movement buttons
+        for btn in self.move_buttons:
+            btn.draw(screen)
+        
+        # Draw ship
         self.ship.draw(screen)
+        
+        # Draw log
         for i, line in enumerate(self.log[-5:]):
             text = font.render(line, True, WHITE)
             screen.blit(text, (20, HEIGHT - 150 + i*25))
 
-    def handle_button(self, btn):
-        if btn == "Progress":
+    def handle_button(self, btn_text):
+        if btn_text == "Progress":
             successes, dice = self.roll_2d20()
             self.add_log(f"Progress roll {dice} -> {successes} successes")
             self.goals[0].mark(successes)
 
     def run(self):
         while True:
+            mouse_pos = pygame.mouse.get_pos()
+            
             screen.fill(BLACK)
-            # Improved starfield with nebula lines
+            # Starfield
             for _ in range(80):
                 pygame.draw.circle(screen, WHITE, (random.randint(0, WIDTH), random.randint(0, HEIGHT)), 1)
-            pygame.draw.line(screen, (50, 0, 100), (200, 100), (400, 300), 2)  # nebula example
+            pygame.draw.line(screen, (50, 0, 100), (200, 100), (400, 300), 2)
 
-            self.ship.draw(screen)
             self.draw_ui()
+
+            # Update button hovers
+            for btn in self.buttons:
+                btn.update(mouse_pos)
+            for btn in self.move_buttons:
+                btn.update(mouse_pos)
 
             for event in pygame.event.get():
                 if event.type == pygame.QUIT:
                     pygame.quit()
                     sys.exit()
-                if event.type == pygame.KEYDOWN:
-                    if event.key == pygame.K_t:
-                        self.show_tutorial = False
-                    if event.key == pygame.K_UP:
+                
+                if event.type == pygame.MOUSEBUTTONDOWN:
+                    # Check movement buttons
+                    if self.move_buttons[0].is_clicked(event.pos):  # Up
                         self.ship.y -= 10
                         self.ship.thrust = 5
-                    if event.key == pygame.K_DOWN:
+                    elif self.move_buttons[1].is_clicked(event.pos):  # Left
+                        self.ship.x -= 10
+                    elif self.move_buttons[2].is_clicked(event.pos):  # Down
                         self.ship.y += 10
                         self.ship.thrust = 5
-                    if event.key == pygame.K_LEFT:
-                        self.ship.x -= 10
-                    if event.key == pygame.K_RIGHT:
+                    elif self.move_buttons[3].is_clicked(event.pos):  # Right
                         self.ship.x += 10
-                if event.type == pygame.MOUSEBUTTONDOWN:
-                    mx, my = pygame.mouse.get_pos()
-                    if WIDTH - 200 < mx < WIDTH:
-                        btn_index = (my - 50) // 60
-                        if 0 <= btn_index < 8:
-                            buttons = ["Progress", "Travel", "Arrive", "Scavenge", "Explore", "Resources", "Combat", "Status"]
-                            self.handle_button(buttons[btn_index])
+                    
+                    # Check action buttons
+                    for btn in self.buttons:
+                        if btn.is_clicked(event.pos):
+                            self.handle_button(btn.text)
+                    
+                    # Check tutorial close
+                    if self.show_tutorial:
+                        tutorial_close = pygame.Rect(WIDTH//2 - 50, HEIGHT - 150, 100, 50)
+                        if tutorial_close.collidepoint(event.pos):
+                            self.show_tutorial = False
 
             if self.show_tutorial:
                 self.draw_tutorial()
