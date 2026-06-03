@@ -42,54 +42,25 @@ class Goal:
     def mark(self, amount):
         self.progress = min(10, self.progress + amount)
 
-class Button:
-    def __init__(self, x, y, width, height, text):
-        self.rect = pygame.Rect(x, y, width, height)
-        self.text = text
-        self.color = BLUE
-        self.hovered = False
-
-    def draw(self, surface):
-        color = (150, 200, 255) if self.hovered else BLUE
-        pygame.draw.rect(surface, color, self.rect)
-        pygame.draw.rect(surface, WHITE, self.rect, 2)
-        text_surf = font.render(self.text, True, WHITE)
-        text_rect = text_surf.get_rect(center=self.rect.center)
-        surface.blit(text_surf, text_rect)
-
-    def is_clicked(self, pos):
-        return self.rect.collidepoint(pos)
-
-    def update(self, pos):
-        self.hovered = self.rect.collidepoint(pos)
-
 class Game:
     def __init__(self):
         self.ship = Ship()
         self.goals = [Goal("Reach next sector", "Normal"), Goal("Upgrade scanner", "Easy")]
-        self.log = ["Welcome. Tap buttons to play."]
+        self.log = ["Welcome. Use arrow keys to move, 1-8 for actions."]
         self.state = "play"
         self.show_tutorial = True
         
-        # Mobile-friendly buttons
-        self.buttons = [
-            Button(WIDTH-200, 50, 180, 50, "Progress"),
-            Button(WIDTH-200, 110, 180, 50, "Travel"),
-            Button(WIDTH-200, 170, 180, 50, "Arrive"),
-            Button(WIDTH-200, 230, 180, 50, "Scavenge"),
-            Button(WIDTH-200, 290, 180, 50, "Explore"),
-            Button(WIDTH-200, 350, 180, 50, "Resources"),
-            Button(WIDTH-200, 410, 180, 50, "Combat"),
-            Button(WIDTH-200, 470, 180, 50, "Status"),
-        ]
-        
-        # Movement buttons for mobile
-        self.move_buttons = [
-            Button(WIDTH//2 - 40, 100, 80, 80, "↑"),
-            Button(50, HEIGHT-150, 80, 80, "←"),
-            Button(150, HEIGHT-150, 80, 80, "↓"),
-            Button(250, HEIGHT-150, 80, 80, "→"),
-        ]
+        # Keyboard action mapping
+        self.key_actions = {
+            pygame.K_1: "Progress",
+            pygame.K_2: "Travel",
+            pygame.K_3: "Arrive",
+            pygame.K_4: "Scavenge",
+            pygame.K_5: "Explore",
+            pygame.K_6: "Resources",
+            pygame.K_7: "Combat",
+            pygame.K_8: "Status",
+        }
 
     def add_log(self, text):
         self.log.append(text)
@@ -104,55 +75,77 @@ class Game:
         return successes, dice
 
     def draw_tutorial(self):
-        overlay = pygame.Surface((WIDTH-200, HEIGHT-200))
+        overlay = pygame.Surface((WIDTH, HEIGHT))
         overlay.fill((0, 0, 0))
         overlay.set_alpha(200)
-        screen.blit(overlay, (100, 100))
+        screen.blit(overlay, (0, 0))
         
         text = big_font.render("TUTORIAL - Solo Voidfarer", True, GREEN)
-        screen.blit(text, (WIDTH//2 - 200, 150))
+        screen.blit(text, (WIDTH//2 - 200, 100))
         lines = [
-            "Tap arrow buttons to move ship",
-            "Tap sidebar buttons for Moves",
+            "Arrow Keys - Move ship",
+            "1 - Progress   2 - Travel    3 - Arrive    4 - Scavenge",
+            "5 - Explore    6 - Resources 7 - Combat    8 - Status",
             "Progress bars fill as you complete missions",
             "Resources deplete on Travel and Explore",
             "NPCs use Perilous Void tables for dialog",
+            "Press SPACE to close this tutorial",
         ]
         for i, line in enumerate(lines):
             t = font.render(line, True, WHITE)
-            screen.blit(t, (150, 220 + i*30))
-        
-        close_btn = Button(WIDTH//2 - 50, HEIGHT - 150, 100, 50, "Close")
-        close_btn.draw(screen)
-        return close_btn.rect
+            screen.blit(t, (WIDTH//2 - 300, 180 + i*40))
 
     def draw_ui(self):
-        # Draw sidebar buttons
-        for btn in self.buttons:
-            btn.draw(screen)
-        
-        # Draw movement buttons
-        for btn in self.move_buttons:
-            btn.draw(screen)
-        
         # Draw ship
         self.ship.draw(screen)
+        
+        # Draw goals
+        for i, goal in enumerate(self.goals):
+            goal_text = font.render(f"{goal.name} ({goal.progress}/10)", True, GREEN)
+            screen.blit(goal_text, (20, 20 + i*30))
+        
+        # Draw resources
+        resources_text = font.render(f"Fuel: {self.ship.resources['fuel']} | O2: {self.ship.resources['oxygen']} | Data: {self.ship.resources['data']}", True, BLUE)
+        screen.blit(resources_text, (20, HEIGHT - 40))
         
         # Draw log
         for i, line in enumerate(self.log[-5:]):
             text = font.render(line, True, WHITE)
             screen.blit(text, (20, HEIGHT - 150 + i*25))
+        
+        # Draw key bindings hint
+        hint_text = font.render("Press H for help", True, GRAY)
+        screen.blit(hint_text, (WIDTH - 200, 20))
 
-    def handle_button(self, btn_text):
-        if btn_text == "Progress":
+    def handle_action(self, action):
+        if action == "Progress":
             successes, dice = self.roll_2d20()
             self.add_log(f"Progress roll {dice} -> {successes} successes")
             self.goals[0].mark(successes)
+        elif action == "Travel":
+            self.add_log("Engaging FTL drive...")
+            self.ship.resources["fuel"] -= 2
+        elif action == "Arrive":
+            self.add_log("Dropping out of FTL...")
+        elif action == "Scavenge":
+            amount = random.randint(1, 5)
+            self.ship.resources["data"] += amount
+            self.add_log(f"Scavenged {amount} data units")
+        elif action == "Explore":
+            self.add_log("Beginning survey...")
+            self.ship.resources["oxygen"] -= 1
+        elif action == "Resources":
+            fuel = self.ship.resources["fuel"]
+            oxygen = self.ship.resources["oxygen"]
+            data = self.ship.resources["data"]
+            self.add_log(f"Resources: Fuel={fuel} O2={oxygen} Data={data}")
+        elif action == "Combat":
+            self.add_log("Red alert! Battle stations!")
+        elif action == "Status":
+            self.add_log(f"Position: ({self.ship.x}, {self.ship.y})")
 
     def run(self):
         while True:
-            mouse_pos = pygame.mouse.get_pos()
-            
             screen.fill(BLACK)
             # Starfield
             for _ in range(80):
@@ -161,40 +154,34 @@ class Game:
 
             self.draw_ui()
 
-            # Update button hovers
-            for btn in self.buttons:
-                btn.update(mouse_pos)
-            for btn in self.move_buttons:
-                btn.update(mouse_pos)
-
             for event in pygame.event.get():
                 if event.type == pygame.QUIT:
                     pygame.quit()
                     sys.exit()
                 
-                if event.type == pygame.MOUSEBUTTONDOWN:
-                    # Check movement buttons
-                    if self.move_buttons[0].is_clicked(event.pos):  # Up
+                if event.type == pygame.KEYDOWN:
+                    # Movement keys
+                    if event.key == pygame.K_UP:
                         self.ship.y -= 10
                         self.ship.thrust = 5
-                    elif self.move_buttons[1].is_clicked(event.pos):  # Left
-                        self.ship.x -= 10
-                    elif self.move_buttons[2].is_clicked(event.pos):  # Down
+                    elif event.key == pygame.K_DOWN:
                         self.ship.y += 10
                         self.ship.thrust = 5
-                    elif self.move_buttons[3].is_clicked(event.pos):  # Right
+                    elif event.key == pygame.K_LEFT:
+                        self.ship.x -= 10
+                    elif event.key == pygame.K_RIGHT:
                         self.ship.x += 10
                     
-                    # Check action buttons
-                    for btn in self.buttons:
-                        if btn.is_clicked(event.pos):
-                            self.handle_button(btn.text)
+                    # Action keys (1-8)
+                    elif event.key in self.key_actions:
+                        action = self.key_actions[event.key]
+                        self.handle_action(action)
                     
-                    # Check tutorial close
-                    if self.show_tutorial:
-                        tutorial_close = pygame.Rect(WIDTH//2 - 50, HEIGHT - 150, 100, 50)
-                        if tutorial_close.collidepoint(event.pos):
-                            self.show_tutorial = False
+                    # Tutorial
+                    elif event.key == pygame.K_SPACE:
+                        self.show_tutorial = False
+                    elif event.key == pygame.K_h:
+                        self.show_tutorial = True
 
             if self.show_tutorial:
                 self.draw_tutorial()
